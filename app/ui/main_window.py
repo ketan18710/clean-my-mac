@@ -23,6 +23,11 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QComboBox,
     QGroupBox,
+    QMenuBar,
+    QMenu,
+    QDialog,
+    QDialogButtonBox,
+    QTextEdit,
 )
 from PySide6.QtGui import QIcon, QPixmap
 
@@ -41,12 +46,13 @@ from app.workers.util import (
     open_trash,
     append_action_log,
 )
+from app import __version__, __author__, __description__
 
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("Clean my Mac")
+        self.setWindowTitle(f"Clean Mac v{__version__}")
         self.resize(1100, 720)
 
         # UI State
@@ -237,6 +243,9 @@ class MainWindow(QMainWindow):
 
         # Workers
         self.scan_controller = ScanController(self._on_scan_result_bg, self._on_scan_done_bg)
+        
+        # Create menu bar
+        self._create_menu_bar()
 
     def _on_size_preset(self) -> None:
         label = self.size_dropdown.currentText()
@@ -580,6 +589,80 @@ class MainWindow(QMainWindow):
         if hdr_item is not None:
             hdr_item.setText("☐ Select")
         self._header_checked = False
+
+    def _create_menu_bar(self) -> None:
+        """Create the application menu bar."""
+        menubar = self.menuBar()
+        
+        # Help menu
+        help_menu = menubar.addMenu("Help")
+        
+        about_action = help_menu.addAction("About Clean Mac")
+        about_action.triggered.connect(self._show_about_dialog)
+        
+        help_menu.addSeparator()
+        
+        permissions_action = help_menu.addAction("Open Privacy Settings")
+        permissions_action.triggered.connect(self._open_privacy_settings)
+
+    def _show_about_dialog(self) -> None:
+        """Show the About dialog."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("About Clean Mac")
+        dialog.setModal(True)
+        dialog.resize(400, 300)
+        
+        layout = QVBoxLayout(dialog)
+        
+        # App info
+        info_text = QTextEdit()
+        info_text.setReadOnly(True)
+        info_text.setHtml(f"""
+        <div style="text-align: center; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+            <h2>Clean Mac</h2>
+            <p><b>Version:</b> {__version__}</p>
+            <p><b>Author:</b> {__author__}</p>
+            <br>
+            <p>{__description__}</p>
+            <br>
+            <p>Clean Mac helps you identify and safely remove old, unused files to reclaim disk space on your Mac.</p>
+            <br>
+            <p><b>Features:</b></p>
+            <ul style="text-align: left;">
+                <li>Smart file scanning using Spotlight metadata</li>
+                <li>Filter by file type, age, and size</li>
+                <li>Safe deletion to Trash with undo support</li>
+                <li>Quick Look preview integration</li>
+                <li>Persistent settings and ignore lists</li>
+            </ul>
+            <br>
+            <p><b>Safety:</b> Clean Mac never deletes system files or app bundles. All deletions go to Trash for easy recovery.</p>
+        </div>
+        """)
+        layout.addWidget(info_text)
+        
+        # Buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        buttons.accepted.connect(dialog.accept)
+        layout.addWidget(buttons)
+        
+        dialog.exec()
+
+    def _open_privacy_settings(self) -> None:
+        """Open macOS Privacy & Security settings."""
+        import subprocess
+        try:
+            # Open System Settings to Privacy & Security > Full Disk Access
+            subprocess.run([
+                "open", 
+                "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
+            ], check=False)
+        except Exception:
+            # Fallback to general System Settings
+            try:
+                subprocess.run(["open", "x-apple.systempreferences:"], check=False)
+            except Exception:
+                self._msg("Settings", "Please manually open System Settings > Privacy & Security > Full Disk Access")
 
 
 class SizeItem(QTableWidgetItem):
